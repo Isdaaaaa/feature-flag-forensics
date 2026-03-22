@@ -36,6 +36,13 @@ type GraphEdge = {
   isConflict: boolean;
 };
 
+type ExportFeedbackTone = 'success' | 'warning';
+
+type ExportFeedback = {
+  tone: ExportFeedbackTone;
+  message: string;
+};
+
 function toneFromEvent(type: string, outcome?: 'on' | 'off'): BadgeTone {
   if (type === 'conflict_detected') return 'conflict';
   if (type === 'flag_evaluated') return outcome === 'on' ? 'matched' : 'missed';
@@ -179,6 +186,81 @@ function buildGraph(
   };
 }
 
+function buildSupportReport(params: {
+  generatedAt: string;
+  timezoneLabel: string;
+  sessionId: string;
+  sessionStartedAt: string;
+  userId: string;
+  region: string;
+  device: string;
+  totalEvents: number;
+  totalFlags: number;
+  conflictCount: number;
+  staleCount: number;
+  outcomesOn: number;
+  outcomesServed: number;
+  timelineHighlights: Array<{ time: string; title: string; detail: string; tone: BadgeTone }>;
+  flagOutcomes: Array<{ flagKey: string; decision: boolean; decisionSource: string; conflict: boolean; stale: boolean }>;
+  evidence: EvidenceItem[];
+}): string {
+  const timelineSection = params.timelineHighlights.length
+    ? params.timelineHighlights
+        .map(
+          (item, index) =>
+            `${index + 1}. [${item.time}] ${item.title} (${item.tone})\n   ${item.detail}`,
+        )
+        .join('\n')
+    : 'None.';
+
+  const outcomeSection = params.flagOutcomes.length
+    ? params.flagOutcomes
+        .map(
+          (flag) =>
+            `- ${flag.flagKey}: ${flag.decision ? 'ON' : 'OFF'} via ${flag.decisionSource}${
+              flag.conflict ? ' · conflict' : ''
+            }${flag.stale ? ' · stale' : ''}`,
+        )
+        .join('\n')
+    : '- No evaluated flags.';
+
+  const evidenceSection = params.evidence.length
+    ? params.evidence
+        .map((item) => `- ${item.label} (${item.tone})\n  ${item.detail}\n  Link: #${item.id}`)
+        .join('\n')
+    : '- No evidence links generated.';
+
+  return [
+    'Feature Flag Forensics — Support Report',
+    '',
+    `Generated: ${params.generatedAt}`,
+    `Timezone: ${params.timezoneLabel}`,
+    '',
+    'Session Summary',
+    `- Session ID: ${params.sessionId}`,
+    `- User ID: ${params.userId}`,
+    `- Started At: ${params.sessionStartedAt}`,
+    `- Region / Device: ${params.region} / ${params.device}`,
+    '',
+    'Key Outcomes',
+    `- Trace events: ${params.totalEvents}`,
+    `- Evaluated flags: ${params.totalFlags}`,
+    `- Outcomes ON: ${params.outcomesOn}`,
+    `- Outcomes served: ${params.outcomesServed}`,
+    `- Conflict count: ${params.conflictCount}`,
+    `- Stale count: ${params.staleCount}`,
+    '',
+    'Per-flag decisions',
+    outcomeSection,
+    '',
+    'Timeline Highlights',
+    timelineSection,
+    '',
+    'Evidence Links',
+    evidenceSection,
+  ].join('\n');
+}
+
 const nodeToneClasses: Record<BadgeTone, string> = {
   matched: 'fill-cyan/20 stroke-cyan',
   missed: 'fill-slate-100/10 stroke-slate-200',
@@ -290,6 +372,9 @@ function GraphPanel({
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TopTab>('trace');
+  const [copyFeedback, setCopyFeedback] = useState<ExportFeedback | null>(null);
+  const [downloadFeedback, setDownloadFeedback] = useState<ExportFeedback | null>(null);
+  const [showManualCopy, setShowManualCopy] = useState(false);
 
   const fixtures = ingestFixtures();
   const selectedSession = fixtures.sessions[0];
@@ -370,6 +455,72 @@ export default function HomePage() {
 
     return buildGraph(uniqueFlagOrder, conflictFlags, getDependencyEdges(fixtures.flags));
   }, [evaluation.perFlag, fixtures.flags, selectedSession?.events]);
+
+  const reportText = selectedSession
+    ? buildSupportReport({
+        generatedAt: new Intl.DateTimeFormat('en-US', {
+          dateStyle: 'medium',
+          timeStyle: 'medium',
+          timeZone: selectedSession.timezone,
+        }).format(new Date()),
+        timezoneLabel,
+        sessionId: selectedSession.id,
+        sessionStartedAt: formatTimeInZone(selectedSession.startedAt, selectedSession.timezone),
+        userId: selectedSession.userId,
+        region: selectedSession.region,
+        device: selectedSession.device,
+        totalEvents: selectedSession.events.length,
+        totalFlags: evaluation.perFlag.length,
+        conflictCount,
+        staleCount,
+        outcomesOn: onOutcomes.length,
+        outcomesServed: servedOutcomes.length,
+        timelineHighlights: timelineItems.slice(0, 5),
+        flagOutcomes: evaluation.perFlag.map((flag) => ({
+          flagKey: flag.flagKey,
+          decision: flag.decision,
+          decisionSource: flag.decisionSource,
+          conflict: flag.marker.conflict,
+          stale: flag.marker.stale,
+        })),
+        evidence: evidenceItems.slice(0, 12),
+      })
+    : 'No session selected. Unable to generate report.';
+
+  const handleCopyReport = async () => {
+    if (!reportText) return;
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API unavailable');
+      }
+      await navigator.clipboard.writeText(reportText);
+      setShowManualCopy(false);
+      setCopyFeedback({ tone: 'success', message: 'Copied report to clipboard.' });
+    } catch {
+      setShowManualCopy(true);
+      setCopyFeedback({
+        tone: 'warning',
+        message: 'Clipboard blocked. Use the manual text area below to copy the report.',
+      });
+    }
+  };
+
+  const handleDownloadReport = () => {
+    if (!reportText) return;
+
+    const slug = selectedSession?.id ?? 'session-report';
+    const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = `${slug}-support-report.txt`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(href);
+    setDownloadFeedback({ tone: 'success', message: `Downloaded ${anchor.download}.` });
+  };
 
   return (
     <main className="min-h-screen bg-[#071226] font-[Inter] text-slate-100">
@@ -458,9 +609,52 @@ export default function HomePage() {
                 Ready with {selectedSession?.events.length ?? 0} events and {evidenceItems.length} evidence link
                 {evidenceItems.length === 1 ? '' : 's'}.
               </p>
-              <button className="mt-3 w-full rounded-xl border border-amber/50 bg-amber/20 px-3 py-2 text-sm font-semibold text-amber">
-                Export report (placeholder)
-              </button>
+
+              <div className="mt-3 grid grid-cols-1 gap-2">
+                <button
+                  onClick={() => {
+                    void handleCopyReport();
+                  }}
+                  className="w-full rounded-xl border border-cyan/50 bg-cyan/15 px-3 py-2 text-sm font-semibold text-cyan transition hover:bg-cyan/25"
+                >
+                  Copy report
+                </button>
+                <button
+                  onClick={handleDownloadReport}
+                  className="w-full rounded-xl border border-amber/50 bg-amber/20 px-3 py-2 text-sm font-semibold text-amber transition hover:bg-amber/30"
+                >
+                  Download .txt
+                </button>
+              </div>
+
+              {copyFeedback ? (
+                <p
+                  className={`mt-2 rounded-lg border px-2 py-1 text-xs ${
+                    copyFeedback.tone === 'success'
+                      ? 'border-cyan/40 bg-cyan/10 text-cyan'
+                      : 'border-amber/40 bg-amber/10 text-amber'
+                  }`}
+                >
+                  {copyFeedback.message}
+                </p>
+              ) : null}
+
+              {downloadFeedback ? (
+                <p className="mt-2 rounded-lg border border-cyan/40 bg-cyan/10 px-2 py-1 text-xs text-cyan">
+                  {downloadFeedback.message}
+                </p>
+              ) : null}
+
+              {showManualCopy ? (
+                <div className="mt-2 rounded-xl border border-dashed border-amber/40 bg-amber/10 p-2">
+                  <p className="text-xs text-amber">Manual copy fallback</p>
+                  <textarea
+                    readOnly
+                    value={reportText}
+                    className="mt-1 h-28 w-full rounded-lg border border-white/20 bg-[#0B1E39]/70 p-2 text-xs text-slate-100"
+                  />
+                </div>
+              ) : null}
             </Card>
           </aside>
 
