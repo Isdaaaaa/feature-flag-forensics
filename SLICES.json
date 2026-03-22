@@ -14,7 +14,7 @@
   {
     "id": "slice-002",
     "name": "Rules evaluation engine",
-    "status": "in_progress",
+    "status": "done",
     "notes": "Deterministic rule evaluation with trace outputs for a session."
   },
   {
