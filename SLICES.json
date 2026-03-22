@@ -26,7 +26,7 @@
   {
     "id": "slice-004",
     "name": "Visualization layer",
-    "status": "todo",
+    "status": "in_progress",
     "notes": "Graph of flag dependencies, conflicts, and rollout splits."
   },
   {
