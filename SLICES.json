@@ -2,7 +2,7 @@
   {
     "id": "slice-000",
     "name": "Bootstrap repo and scaffolding",
-    "status": "todo",
+    "status": "in_progress",
     "notes": "Set up project structure, linting, base UI shell."
   },
   {
