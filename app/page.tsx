@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { ingestFixtures } from '@/lib/fixtures/ingest';
+import { evaluateSessionRules } from '@/lib/rules/evaluate';
 
 type BadgeTone = 'matched' | 'missed' | 'conflict' | 'stale' | 'neutral';
 
@@ -35,6 +36,7 @@ export default function HomePage() {
   const fixtures = ingestFixtures();
   const selectedSession = fixtures.sessions[0];
   const selectedUser = fixtures.users.find((user) => user.id === selectedSession?.userId);
+  const evaluation = evaluateSessionRules(fixtures, selectedSession?.id);
 
   const timelineItems =
     selectedSession?.events.map((event) => ({
@@ -45,28 +47,37 @@ export default function HomePage() {
       tone: toneFromEvent(event.type, event.outcome),
     })) ?? [];
 
-  const primaryEvaluation = selectedSession?.events.find((event) => event.type === 'flag_evaluated');
+  const primaryFlag = evaluation.perFlag[0];
+  const matchedConditionStrings =
+    primaryFlag?.rules
+      .flatMap((rule) => rule.matchedConditions)
+      .map((condition) => condition.reason) ?? [];
+  const missedConditionStrings =
+    primaryFlag?.rules
+      .flatMap((rule) => rule.missedConditions)
+      .map((condition) => condition.reason) ?? [];
+
   const explanationItems = [
     {
-      title: 'Matched attributes',
-      body:
-        primaryEvaluation?.matchedAttributes?.join(', ') ||
-        'No matched attributes were captured for the selected session.',
+      title: 'Matched rule conditions',
+      body: matchedConditionStrings.join(', ') || 'No conditions matched for the selected flag.',
     },
     {
-      title: 'Missed attributes',
-      body:
-        primaryEvaluation?.missedAttributes?.join(', ') ||
-        'No missed attributes were captured for the selected session.',
+      title: 'Missed rule conditions',
+      body: missedConditionStrings.join(', ') || 'No missed conditions were found for the selected flag.',
     },
     {
-      title: 'Final outcome',
-      body: selectedSession?.events.at(-1)?.detail || 'No final outcome was recorded.',
+      title: 'Final evaluated outcome',
+      body: primaryFlag
+        ? `${primaryFlag.flagKey} resolved ${primaryFlag.decision ? 'ON' : 'OFF'} (${primaryFlag.decisionSource})`
+        : 'No evaluated decision was produced.',
     },
   ];
 
   const servedOutcomes = selectedSession?.events.filter((event) => event.type === 'outcome_served') ?? [];
   const onOutcomes = selectedSession?.events.filter((event) => event.outcome === 'on') ?? [];
+  const conflictCount = evaluation.perFlag.filter((flag) => flag.marker.conflict).length;
+  const staleCount = evaluation.perFlag.filter((flag) => flag.marker.stale).length;
 
   return (
     <main className="min-h-screen bg-[#071226] text-slate-100">
@@ -95,6 +106,8 @@ export default function HomePage() {
             <Badge label={`flags=${fixtures.flags.length}`} tone="neutral" />
             <Badge label={`outcomes_on=${onOutcomes.length}`} tone="matched" />
             <Badge label={`outcomes_served=${servedOutcomes.length}`} tone="conflict" />
+            <Badge label={`conflicts=${conflictCount}`} tone={conflictCount > 0 ? 'conflict' : 'neutral'} />
+            <Badge label={`stale=${staleCount}`} tone={staleCount > 0 ? 'stale' : 'neutral'} />
           </div>
         </section>
 
