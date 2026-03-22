@@ -1,0 +1,22 @@
+{
+  "datasetName": "user-attrs-incident-2026-03-22",
+  "source": "identity-profile-cache",
+  "users": [
+    {
+      "id": "user_09812",
+      "country": "US",
+      "subscriptionTier": "starter",
+      "accountAgeDays": 34,
+      "appVersion": "2.3.1",
+      "cohort": "public"
+    },
+    {
+      "id": "user_77104",
+      "country": "CA",
+      "subscriptionTier": "pro",
+      "accountAgeDays": 201,
+      "appVersion": "2.4.0",
+      "cohort": "public"
+    }
+  ]
+}

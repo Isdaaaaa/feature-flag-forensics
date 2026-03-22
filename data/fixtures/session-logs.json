@@ -1,0 +1,31 @@
+[
+  {
+    "session_id": "session_4f2e7",
+    "user_id": "user_09812",
+    "started_at": "2026-03-22T06:05:13Z",
+    "events": [
+      {
+        "at": "2026-03-22T06:05:13Z",
+        "title": "Session started",
+        "detail": "US-West / iOS 17 / app v2.3.1",
+        "tone": "neutral"
+      },
+      {
+        "at": "2026-03-22T06:05:17Z",
+        "title": "Rule set evaluated",
+        "detail": "checkout_redesign gate read with 5 conditions",
+        "tone": "matched"
+      },
+      {
+        "at": "2026-03-22T06:05:19Z",
+        "title": "Conflict detected",
+        "detail": "geo whitelist matched, subscription tier missed",
+        "tone": "conflict"
+      }
+    ],
+    "flag_outcomes": [
+      { "flag_key": "checkout_redesign", "variant": "OFF", "state": "conflict" },
+      { "flag_key": "payment_retry_v2", "variant": "ON", "state": "matched" }
+    ]
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "flag_key": "checkout_redesign",
+    "description": "Controls redesigned checkout flow",
+    "default": "OFF",
+    "rules": [
+      {
+        "id": "rule-geo-whitelist",
+        "label": "Geo + app version gate",
+        "conditions": [
+          { "attribute": "country", "operator": "equals", "value": "US" },
+          { "attribute": "app_version", "operator": "gte", "value": "2.3.0" }
+        ],
+        "outcome": "ON"
+      },
+      {
+        "id": "rule-pro-tier",
+        "label": "Subscription override",
+        "conditions": [{ "attribute": "subscription_tier", "operator": "equals", "value": "pro" }],
+        "outcome": "ON"
+      }
+    ]
+  },
+  {
+    "flag_key": "payment_retry_v2",
+    "description": "New payment retry flow",
+    "default": "OFF",
+    "rules": [
+      {
+        "id": "rule-risk-low",
+        "label": "Low risk users",
+        "conditions": [{ "attribute": "fraud_risk", "operator": "lte", "value": 3 }],
+        "outcome": "ON"
+      }
+    ]
+  }
+]

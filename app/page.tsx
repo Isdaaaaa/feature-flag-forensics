@@ -1,19 +1,73 @@
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { ingestFixtures } from '@/lib/fixtures/ingest';
 
-const timelineItems = [
-  { time: '14:05:13', title: 'Session started', detail: 'US-West / iOS 17 / app v2.3.1', tone: 'neutral' as const },
-  { time: '14:05:17', title: 'Rule set evaluated', detail: 'checkout_redesign gate read with 5 conditions', tone: 'matched' as const },
-  { time: '14:05:19', title: 'Conflict detected', detail: 'geo whitelist matched, subscription tier missed', tone: 'conflict' as const },
-];
+type BadgeTone = 'matched' | 'missed' | 'conflict' | 'stale' | 'neutral';
 
-const explanationItems = [
-  { title: 'Matched attributes', body: 'country=US, app_version>=2.3.0, account_age_days=34' },
-  { title: 'Missed attributes', body: 'subscription_tier expected "pro" but got "starter"' },
-  { title: 'Final outcome', body: 'Flag served OFF by fallback policy and conflict precedence.' },
-];
+function toneFromEvent(type: string, outcome?: 'on' | 'off'): BadgeTone {
+  if (type === 'conflict_detected') {
+    return 'conflict';
+  }
+  if (type === 'flag_evaluated') {
+    return outcome === 'on' ? 'matched' : 'missed';
+  }
+  if (type === 'outcome_served') {
+    return outcome === 'on' ? 'matched' : 'conflict';
+  }
+  return 'neutral';
+}
+
+function formatTimeInZone(timestamp: string, timezone: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZoneName: 'short',
+  }).formatToParts(new Date(timestamp));
+
+  const valueByType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${valueByType.hour}:${valueByType.minute}:${valueByType.second} ${valueByType.timeZoneName ?? ''}`.trim();
+}
 
 export default function HomePage() {
+  const fixtures = ingestFixtures();
+  const selectedSession = fixtures.sessions[0];
+  const selectedUser = fixtures.users.find((user) => user.id === selectedSession?.userId);
+
+  const timelineItems =
+    selectedSession?.events.map((event) => ({
+      key: event.id,
+      time: formatTimeInZone(event.timestamp, selectedSession.timezone),
+      title: event.title,
+      detail: event.detail,
+      tone: toneFromEvent(event.type, event.outcome),
+    })) ?? [];
+
+  const primaryEvaluation = selectedSession?.events.find((event) => event.type === 'flag_evaluated');
+  const explanationItems = [
+    {
+      title: 'Matched attributes',
+      body:
+        primaryEvaluation?.matchedAttributes?.join(', ') ||
+        'No matched attributes were captured for the selected session.',
+    },
+    {
+      title: 'Missed attributes',
+      body:
+        primaryEvaluation?.missedAttributes?.join(', ') ||
+        'No missed attributes were captured for the selected session.',
+    },
+    {
+      title: 'Final outcome',
+      body: selectedSession?.events.at(-1)?.detail || 'No final outcome was recorded.',
+    },
+  ];
+
+  const servedOutcomes = selectedSession?.events.filter((event) => event.type === 'outcome_served') ?? [];
+  const onOutcomes = selectedSession?.events.filter((event) => event.outcome === 'on') ?? [];
+
   return (
     <main className="min-h-screen bg-[#071226] text-slate-100">
       <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 md:px-8">
@@ -32,32 +86,58 @@ export default function HomePage() {
 
         <section className="sticky top-3 z-10 rounded-2xl border border-white/15 bg-[#0E2748]/95 p-3 shadow-card backdrop-blur">
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Badge label="user_09812" />
-            <Badge label="session_4f2e7" />
-            <Badge label="checkout_redesign=OFF" tone="conflict" />
-            <Badge label="payment_retry_v2=ON" tone="matched" />
+            <Badge label={selectedUser?.id ?? 'user_unknown'} />
+            <Badge label={selectedSession?.id ?? 'session_unknown'} />
+            <Badge
+              label={`trace_events=${selectedSession?.events.length ?? 0}`}
+              tone={selectedSession?.events.length ? 'matched' : 'neutral'}
+            />
+            <Badge label={`flags=${fixtures.flags.length}`} tone="neutral" />
+            <Badge label={`outcomes_on=${onOutcomes.length}`} tone="matched" />
+            <Badge label={`outcomes_served=${servedOutcomes.length}`} tone="conflict" />
           </div>
         </section>
 
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <aside className="lg:col-span-3">
             <Card title="Fixtures" subtitle="Dataset and metadata drawer">
-              <p className="text-sm text-slate-200">Select sample incident fixtures and user/session metadata for replay.</p>
-              <div className="mt-3 rounded-xl border border-dashed border-white/25 p-3 text-xs text-slate-300">Fixture drawer placeholder — slice-001 will load config + session files.</div>
+              <ul className="space-y-2 text-sm text-slate-200">
+                {fixtures.metadata.map((fixture) => (
+                  <li key={fixture.name} className="rounded-xl border border-white/10 bg-white/5 p-2">
+                    <p className="font-medium text-white">{fixture.name}</p>
+                    <p className="text-xs text-slate-300">source: {fixture.source}</p>
+                    <p className="mt-1 text-xs text-slate-300">records: {fixture.recordCount}</p>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 rounded-xl border border-dashed border-white/25 p-3 text-xs text-slate-300">
+                Selected session: {selectedSession?.id ?? 'none'}
+                <br />
+                User: {selectedSession?.userId ?? 'unknown'}
+                <br />
+                Region/device: {selectedSession ? `${selectedSession.region} / ${selectedSession.device}` : 'n/a'}
+              </div>
             </Card>
 
             <Card title="Export" subtitle="Support-ready handoff" className="mt-4">
-              <p className="text-sm text-slate-200">Generate a concise incident summary with timestamps, matched rules, and evidence links.</p>
-              <button className="mt-3 w-full rounded-xl border border-amber/50 bg-amber/20 px-3 py-2 text-sm font-semibold text-amber">Export report (placeholder)</button>
+              <p className="text-sm text-slate-200">
+                Generate a concise incident summary with timestamps, matched rules, and evidence links.
+              </p>
+              <p className="mt-2 text-xs text-slate-300">
+                Placeholder context from fixture: {selectedSession?.events.length ?? 0} timeline events loaded.
+              </p>
+              <button className="mt-3 w-full rounded-xl border border-amber/50 bg-amber/20 px-3 py-2 text-sm font-semibold text-amber">
+                Export report (placeholder)
+              </button>
             </Card>
           </aside>
 
-          <div className="lg:col-span-9 grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <Card title="Timeline trace" subtitle="Ordered rule decisions and events">
+          <div className="grid grid-cols-1 gap-4 lg:col-span-9 xl:grid-cols-2">
+            <Card title="Timeline trace" subtitle={`Ordered rule decisions and events · TZ ${selectedSession?.timezone ?? 'n/a'}`}>
               <ul className="space-y-3">
                 {timelineItems.map((item) => (
-                  <li key={`${item.time}-${item.title}`} className="rounded-xl border border-white/15 bg-white/5 p-3">
-                    <div className="mb-1 flex items-center justify-between">
+                  <li key={item.key} className="rounded-xl border border-white/15 bg-white/5 p-3">
+                    <div className="mb-1 flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-white">{item.title}</p>
                       <Badge label={item.time} tone={item.tone} />
                     </div>
@@ -65,7 +145,9 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-              <div className="mt-4 rounded-xl border border-cyan/30 bg-cyan/10 p-3 text-sm text-cyan">Loading state preview: evaluating additional flags…</div>
+              <div className="mt-4 rounded-xl border border-cyan/30 bg-cyan/10 p-3 text-sm text-cyan">
+                Loading state preview: evaluating additional flags…
+              </div>
             </Card>
 
             <Card title="Decision explanations" subtitle="Why this outcome happened">
@@ -77,7 +159,9 @@ export default function HomePage() {
                   </article>
                 ))}
               </div>
-              <div className="mt-4 rounded-xl border border-dashed border-white/20 p-4 text-sm text-slate-300">Empty state preview: choose a fixture and session to generate explanation cards.</div>
+              <div className="mt-4 rounded-xl border border-dashed border-white/20 p-4 text-sm text-slate-300">
+                Empty state preview: choose a fixture and session to generate explanation cards.
+              </div>
             </Card>
           </div>
         </section>
