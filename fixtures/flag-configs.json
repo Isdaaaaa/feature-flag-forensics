@@ -1,0 +1,46 @@
+{
+  "datasetName": "production-snapshot-2026-03-22",
+  "source": "launchdarkly-export",
+  "generatedAt": "2026-03-22T05:55:00Z",
+  "flags": [
+    {
+      "key": "checkout_redesign",
+      "name": "Checkout Redesign",
+      "owner": "growth-team",
+      "environment": "production",
+      "status": "active",
+      "defaultValue": false,
+      "rules": [
+        {
+          "id": "rule_geo_tier",
+          "description": "US users on app >= 2.3.0 and tier=pro",
+          "conditions": [
+            "country == US",
+            "app_version >= 2.3.0",
+            "subscription_tier == pro"
+          ]
+        },
+        {
+          "id": "rule_internal",
+          "description": "Always on for internal cohort",
+          "conditions": ["cohort == internal"]
+        }
+      ]
+    },
+    {
+      "key": "payment_retry_v2",
+      "name": "Payment Retry V2",
+      "owner": "payments-platform",
+      "environment": "production",
+      "status": "active",
+      "defaultValue": true,
+      "rules": [
+        {
+          "id": "rule_region",
+          "description": "Enabled for US + CA",
+          "conditions": ["country in [US, CA]"]
+        }
+      ]
+    }
+  ]
+}

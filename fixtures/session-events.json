@@ -1,0 +1,63 @@
+{
+  "datasetName": "session-traces-incident-2026-03-22",
+  "source": "forensics-replay-recorder",
+  "sessions": [
+    {
+      "id": "session_4f2e7",
+      "userId": "user_09812",
+      "region": "US-West",
+      "device": "iOS 17",
+      "appVersion": "2.3.1",
+      "timezone": "America/Los_Angeles",
+      "startedAt": "2026-03-22T14:05:13-07:00",
+      "events": [
+        {
+          "id": "evt_001",
+          "timestamp": "2026-03-22T14:05:13-07:00",
+          "type": "session_start",
+          "title": "Session started",
+          "detail": "US-West / iOS 17 / app v2.3.1"
+        },
+        {
+          "id": "evt_002",
+          "timestamp": "2026-03-22T14:05:17-07:00",
+          "type": "flag_evaluated",
+          "title": "Rule set evaluated",
+          "detail": "checkout_redesign gate read with 5 conditions",
+          "flagKey": "checkout_redesign",
+          "matchedAttributes": ["country=US", "app_version>=2.3.0", "account_age_days=34"],
+          "missedAttributes": ["subscription_tier expected pro but got starter"],
+          "outcome": "off"
+        },
+        {
+          "id": "evt_003",
+          "timestamp": "2026-03-22T14:05:19-07:00",
+          "type": "conflict_detected",
+          "title": "Conflict detected",
+          "detail": "geo whitelist matched, subscription tier missed",
+          "flagKey": "checkout_redesign",
+          "outcome": "off"
+        },
+        {
+          "id": "evt_004",
+          "timestamp": "2026-03-22T14:05:22-07:00",
+          "type": "outcome_served",
+          "title": "Fallback policy applied",
+          "detail": "checkout_redesign served OFF by conflict precedence",
+          "flagKey": "checkout_redesign",
+          "outcome": "off"
+        },
+        {
+          "id": "evt_005",
+          "timestamp": "2026-03-22T14:05:26-07:00",
+          "type": "flag_evaluated",
+          "title": "Secondary flag evaluated",
+          "detail": "payment_retry_v2 matched regional rollout",
+          "flagKey": "payment_retry_v2",
+          "matchedAttributes": ["country=US"],
+          "outcome": "on"
+        }
+      ]
+    }
+  ]
+}
