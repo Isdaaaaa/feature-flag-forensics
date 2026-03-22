@@ -8,7 +8,7 @@
   {
     "id": "slice-001",
     "name": "Sample data ingestion",
-    "status": "in_progress",
+    "status": "done",
     "notes": "Load flag configs, user attributes, and session logs from fixtures."
   },
   {
