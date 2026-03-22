@@ -32,7 +32,7 @@
   {
     "id": "slice-005",
     "name": "Support-ready report export",
-    "status": "todo",
+    "status": "in_progress",
     "notes": "Generate sharable summaries for support and engineering."
   },
   {
