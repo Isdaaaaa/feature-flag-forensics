@@ -1,6 +1,6 @@
-import flagConfigsRaw from '@/fixtures/flag-configs.json';
-import sessionEventsRaw from '@/fixtures/session-events.json';
-import userAttributesRaw from '@/fixtures/user-attributes.json';
+import flagConfigsRaw from '@/data/fixtures/flag-configs.json';
+import sessionEventsRaw from '@/data/fixtures/session-logs.json';
+import userAttributesRaw from '@/data/fixtures/user-attributes.json';
 import type {
   FlagConfig,
   FlagConfigFixture,
